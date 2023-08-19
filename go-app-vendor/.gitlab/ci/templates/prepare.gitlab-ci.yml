@@ -1,0 +1,32 @@
+.cache_modules:
+  cache:
+    paths:
+      - vendor/
+    policy: pull-push
+
+lint:
+  stage: prepare
+  image: "${GO_IMAGE}"
+  allow_failure: true
+  script:
+    - curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.54.1
+    - golangci-lint version
+    - golangci-lint run --modules-download-mode=vendor --concurrency=1 -v
+
+test:
+  stage: prepare
+  image: "${GO_IMAGE}"
+  coverage: '/total:\s*\(statements\)\s*([\d.]+)%/'
+  script:
+    - go test -mod=vendor --race -gcflags=-l -v -coverprofile .coverage.out ./...
+
+compile:
+  stage: prepare
+  image: "${GO_IMAGE}"
+  script:
+    - ldflags="-X main.CommitRefName=${CI_COMMIT_REF_SLUG} -X main.CommitSHA=${CI_COMMIT_SHA:0:8} -X main.BuildDate=$(TZ=Asia/Tehran date '+%FT%T') -linkmode external -extldflags '-static'"
+    - go build -mod=vendor --ldflags "${ldflags}" -o ./bin/manager ./main.go
+  artifacts:
+    paths:
+      - ./bin/manager
+    expire_in: 1 week

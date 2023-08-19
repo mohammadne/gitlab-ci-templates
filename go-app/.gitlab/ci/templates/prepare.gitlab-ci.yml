@@ -1,0 +1,42 @@
+.download_modules: &download_modules
+  - go env -w GOPROXY="https://goproxy.io,goproxy.cn,direct"
+  - go mod vendor
+
+.cache_modules:
+  cache:
+    paths:
+      - vendor/
+    policy: pull-push
+
+lint:
+  stage: prepare
+  image: "${GO_IMAGE}"
+  allow_failure: true
+  script:
+    - *download_modules
+    - curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.54.1
+    - golangci-lint version
+    - golangci-lint run --modules-download-mode=vendor --concurrency=1 -v
+  extends: .cache_modules
+
+test:
+  stage: prepare
+  image: "${GO_IMAGE}"
+  coverage: '/total:\s*\(statements\)\s*([\d.]+)%/'
+  script:
+    - *download_modules
+    - go test -mod=vendor --race -gcflags=-l -v -coverprofile .coverage.out ./...
+  extends: .cache_modules
+
+compile:
+  stage: prepare
+  image: "${GO_IMAGE}"
+  script:
+    - *download_modules
+    - ldflags="-X main.CommitRefName=${CI_COMMIT_REF_SLUG} -X main.CommitSHA=${CI_COMMIT_SHA:0:8} -X main.BuildDate=$(TZ=Asia/Tehran date '+%FT%T') -linkmode external -extldflags '-static'"
+    - go build -mod=vendor --ldflags "${ldflags}" -o ./bin/manager ./main.go
+  artifacts:
+    paths:
+      - ./bin/manager
+    expire_in: 1 week
+  extends: .cache_modules

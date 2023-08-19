@@ -1,0 +1,15 @@
+stages:
+  - prepare
+  - build-push
+
+variables:
+  GO_IMAGE: "golang:1.20.5-bookworm"
+  DOCKER_IMAGE: "docker:latest"
+
+include:
+  - local: .gitlab/ci/templates/prepare.gitlab-ci.yml
+  - local: .gitlab/ci/templates/build-push.gitlab-ci.yml
+
+default:
+  tags:
+    - docker-runner
